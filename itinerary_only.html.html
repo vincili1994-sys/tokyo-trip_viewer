@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>東京私旅 - 純行程分享版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #fee2e2;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .bg-chiikawa {
+            background-image: linear-gradient(to bottom, rgba(255, 254, 250, 0.88), rgba(254, 249, 235, 0.92)), 
+                              url('Gemini_Generated_Image_ng161ang161ang16.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; overflow-x: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-slate-700 antialiased">
+
+<div id="app" class="max-w-md mx-auto min-h-screen bg-chiikawa flex flex-col shadow-2xl relative pb-24 overflow-x-hidden">
+    
+    <header class="bg-sky-950 p-5 pt-6 pb-3 sticky top-0 z-40 border-b border-sky-900 shadow-md">
+        <div class="flex justify-between items-center mb-2">
+            <div>
+                <span class="text-[10px] tracking-widest text-sky-300 block mb-0.5">🌟 FAMILY TOKYO 2026 🍡</span>
+                <h1 class="text-lg font-bold tracking-tight text-amber-100 flex items-center gap-1.5">
+                    東京。五日慢遊購物團
+                </h1>
+            </div>
+            <div class="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-200 shadow-md flex-shrink-0 bg-white">
+                <img src="Gemini_Generated_Image_xy1nwaxy1nwaxy1n.png" alt="ICON" class="w-full h-full object-cover">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-sky-900/40 p-2 rounded-xl border border-sky-800 text-xs my-1">
+            <span class="text-amber-200 font-bold flex-shrink-0">🌐 雲端多機同步狀態：</span>
+            <div class="flex items-center gap-1.5">
+                <span v-if="isSynced" class="text-emerald-400 font-bold animate-pulse">● 已自動連線</span>
+                <span v-else class="text-rose-400 font-bold">● 連線中...</span>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'itinerary'" class="flex gap-2.5 overflow-x-auto no-scrollbar mt-3 pb-1">
+            <button 
+                v-for="(day, index) in days" 
+                :key="index"
+                @click="selectedDay = index"
+                :class="selectedDay === index ? 'bg-amber-100 text-sky-950 font-bold scale-105 shadow-md border-amber-200' : 'bg-sky-900/60 text-sky-200 border-sky-800/80'"
+                class="flex-shrink-0 px-3.5 py-1.5 rounded-2xl text-center transition-all duration-300 min-w-[75px] border"
+            >
+                <span class="block text-sm font-bold tracking-wide uppercase">{{ day.weekShort }}</span>
+                <span class="text-[11px] opacity-80 block mt-0.5">{{ day.dateNum }}</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4">
+
+        <div v-if="currentTab === 'itinerary'" class="space-y-4 animate-fade-in">
+            
+            <div class="bg-white/85 backdrop-blur-md rounded-2xl p-4 border border-rose-100 shadow-sm flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">{{ activeWeather.icon }}</span>
+                    <div>
+                        <h4 class="text-xs font-bold px-1.5 py-0.5 rounded text-white inline-block mb-1" :class="activeWeather.badgeClass">
+                            {{ activeWeather.typeTitle }}
+                        </h4>
+                        <p class="text-sm font-bold text-slate-700">{{ activeWeather.desc }}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-base font-bold text-sky-900 block whitespace-nowrap">
+                        {{ activeWeather.tempInfo }}
+                    </span>
+                    <span v-if="activeWeather.pop !== null" class="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-md font-bold block mt-0.5 whitespace-nowrap">
+                        💧 降雨率 {{ activeWeather.pop }}%
+                    </span>
+                </div>
+            </div>
+
+            <div class="bg-sky-900/90 p-3 rounded-xl border border-sky-800 text-center shadow-sm">
+                <span class="text-xs text-amber-100 font-medium">✨ 今日主題：{{ days[selectedDay]?.title }} ✨</span>
+            </div>
+
+            <div id="drag-container" class="space-y-3 relative">
+                <div v-for="(event, idx) in currentDayEvents" :key="event.id" :data-id="event.id" class="relative">
+                    
+                    <div v-if="idx > 0 || (selectedDay > 0 && getPrevDayHotel(selectedDay))" class="my-3 mx-4 flex items-center justify-between bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-200/60 text-xs text-slate-500">
+                        <div class="flex items-center gap-1.5 font-medium">
+                            <span v-if="event.transMode === 'walk'">🚶‍♂️ 步行</span>
+                            <span v-else-if="event.transMode === 'drive'">🚗 開車</span>
+                            <span v-else>🚌 大眾運輸</span>
+                            <span>往目的地約 {{ event.transTime || '20' }} 分鐘</span>
+                        </div>
+                    </div>
+
+                    <div v-if="idx === 0 && selectedDay > 0" class="text-[10px] text-center bg-amber-50 text-amber-800 py-1.5 rounded-md mb-2 border border-amber-100">
+                        🏨 起點：{{ getPrevDayHotel(selectedDay) }}
+                    </div>
+
+                    <div v-if="event.category === '航班'" class="bg-gradient-to-r from-sky-900 to-indigo-950 text-white p-4 rounded-2xl shadow-md">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="bg-amber-400 text-sky-950 font-bold text-[10px] px-2 py-0.5 rounded-full">✈️ 航班資訊</span>
+                            <span class="text-xs font-mono text-sky-200">{{ event.flightNum }}</span>
+                        </div>
+                        <div class="grid grid-cols-3 items-center text-center my-2">
+                            <div><span class="text-xl font-black block">{{ event.flightDep }}</span><span class="text-xs text-sky-200">{{ event.time }}</span></div>
+                            <div class="text-[10px] text-sky-300">── ✈️ ──<br>{{ event.flightDuration }}</div>
+                            <div><span class="text-xl font-black block">{{ event.flightArr }}</span><span class="text-xs text-sky-200">{{ event.flightArrTime }}</span></div>
+                        </div>
+                        <p v-if="event.note" class="text-xs text-sky-200/90 bg-white/10 p-2 rounded-xl mt-2 whitespace-pre-line">{{ event.note }}</p>
+                    </div>
+
+                    <div v-else class="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-rose-50 shadow-sm transition-all">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-md" :class="getCategoryClass(event.category)">{{ event.category }}</span>
+                                <span class="text-xs font-bold text-sky-700">⏰ {{ event.time }}</span>
+                            </div>
+                            <button @click.stop="triggerGoogleMap(event.location)" class="text-xs bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 px-2.5 py-1 rounded-full">🗺️ 導航</button>
+                        </div>
+                        <h4 class="text-base font-bold text-slate-800 mb-2">{{ event.location }}</h4>
+                        <div v-if="event.openTime || event.ticketPrice" class="text-xs text-slate-500 bg-slate-50 p-2 rounded-xl mb-2">
+                            <p v-if="event.openTime">🕒 營業: {{ event.openTime }}</p>
+                            <p v-if="event.ticketPrice">🎫 門票: {{ event.ticketPrice }}</p>
+                        </div>
+                        <p v-if="event.note" class="text-xs text-slate-600 bg-amber-50/50 p-2.5 rounded-xl whitespace-pre-line">{{ event.note }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentTab === 'info'" class="space-y-4 animate-fade-in">
+            <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200 shadow-sm">
+                <h3 class="text-sm font-bold text-amber-900 mb-3">🪙 港幣即時換算 (1 JPY = {{ exchangeRate }} HKD)</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" v-model.number="calcInputJPY" placeholder="輸入日圓 JPY" class="text-sm p-2.5 bg-white border border-amber-200 rounded-xl focus:outline-none font-bold">
+                    <div class="p-2.5 bg-amber-100 rounded-xl font-bold text-rose-600 flex items-center">HK$ {{ (calcInputJPY * exchangeRate).toFixed(2) }}</div>
+                </div>
+            </div>
+
+            <div class="bg-white/90 p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <h3 class="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">🏨 酒店資訊</h3>
+                <p class="text-xs text-slate-600"><strong>名稱：</strong>東京淺草橫綱Hotel (Yokokuna Hotel Asakusa)</p>
+                <p class="text-xs text-slate-600"><strong>地址：</strong>東京都台東区浅草3丁目30-5</p>
+                <button @click="triggerGoogleMap('Asakusa Yokozuna Hotel')" class="w-full mt-2 py-2 bg-sky-900 text-amber-100 font-bold text-xs rounded-lg shadow-sm">開啟 Google Maps</button>
+            </div>
+
+            <div class="bg-red-50 p-4 rounded-2xl border border-red-200">
+                <h3 class="text-sm font-bold text-red-900 mb-2">🚨 緊急求助</h3>
+                <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <div class="bg-white p-2 rounded-xl text-center shadow-sm"><span class="text-red-600 text-lg">110</span><br>警察局</div>
+                    <div class="bg-white p-2 rounded-xl text-center shadow-sm"><span class="text-red-600 text-lg">119</span><br>救護車</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 flex justify-around py-3 px-2">
+        <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-sky-900 font-bold' : 'text-slate-400'" class="flex flex-col items-center flex-1 focus:outline-none">
+            <span class="text-xl">{{ tab.icon }}</span><span class="text-[10px] mt-1">{{ tab.name }}</span>
+        </button>
+    </nav>
+
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+const SUPABASE_URL = "https://vumrenvgdbjeaiuvnuzx.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1bXJlbnZnZGJqZWFpdXZudXp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTI4NDcsImV4cCI6MjA5NjYyODg0N30.Rn_WmoNaz1-PfHDznfJY0g_UU-kWs3UR4Wd5e2SchEo";
+const FIXED_ROOM_ID = "tokyo2026_family";
+
+createApp({
+    setup() {
+        const currentTab = ref('itinerary');
+        const selectedDay = ref(0);
+        const exchangeRate = ref(0.051); 
+        const calcInputJPY = ref(null);
+        
+        const isSynced = ref(false);
+        let supabaseClient = null;
+        let cloudChannel = null;
+
+        const weatherDatabase = ref({});
+
+        const days = [
+            { weekShort:'Mon', dateNum:'15', title:'抵達與淺草寺散步', dateStr: '2026-06-15' },
+            { weekShort:'Tue', dateNum:'16', title:'御殿場 Outlet', dateStr: '2026-06-16' },
+            { weekShort:'Wed', dateNum:'17', title:'築地與分頭活動', dateStr: '2026-06-17' },
+            { weekShort:'Thu', dateNum:'18', title:'晴空塔與銀座', dateStr: '2026-06-18' },
+            { weekShort:'Fri', dateNum:'19', title:'成田機場回港', dateStr: '2026-06-19' }
+        ];
+
+        // 🌟 導航分頁清單已簡化為兩個
+        const tabs = [
+            {id:'itinerary', name:'每日行程', icon:'📍'}, 
+            {id:'info', name:'旅遊資訊', icon:'ℹ️'}
+        ];
+        
+        const defaultEvents = [
+            { id: 1, dayIdx: 0, category: '航班', location: '成田空港', time: '14:55', flightNum: 'HX608', flightDep: 'HKG', flightArr: 'NRT', flightArrTime: '20:10', flightDuration: '4h 15m', note: '抵達成田空港\n辦理入境提取行李。', transTime: '50', transMode: 'transit' },
+            { id: 2, dayIdx: 0, category: '住宿', location: '東京淺草橫綱Hotel', time: '21:30', note: '辦理入住手續', transTime: '15', transMode: 'walk' },
+            { id: 3, dayIdx: 0, category: '美食', location: '淺草附近拉麵/居酒屋', time: '22:00', note: '宵夜與放鬆', transTime: '0', transMode: 'walk' },
+            { id: 4, dayIdx: 1, category: '景點', location: '御殿場 Premium Outlets', time: '10:00', openTime: '10:00-20:00', note: '瘋狂購物行程！', transTime: '120', transMode: 'drive' },
+            { id: 5, dayIdx: 2, category: '美食', location: '築地場外市場', time: '08:30', note: '早餐享用海鮮丼與玉子燒', transTime: '30', transMode: 'transit' },
+            { id: 6, dayIdx: 2, category: '景點', location: '分頭活動 / 自由逛街', time: '13:00', note: '各自安排想去的景點', transTime: '40', transMode: 'transit' },
+            { id: 7, dayIdx: 3, category: '景點', location: '東京晴空塔 (SKYTREE)', time: '09:35', ticketPrice: '已預約 09:30 門票', note: '登高看東京全景', transTime: '30', transMode: 'transit' },
+            { id: 8, dayIdx: 3, category: '景點', location: '銀座 / 有樂町散策', time: '14:00', note: '逛街精品、無印良品旗艦店', transTime: '25', transMode: 'transit' },
+            { id: 9, dayIdx: 4, category: '景點', location: '淺草寺周邊最後巡禮', time: '09:00', note: '買手信、補貨', transTime: '60', transMode: 'transit' },
+            { id: 10, dayIdx: 4, category: '航班', location: '成田空港', time: '15:30', flightNum: 'HX609', flightDep: 'NRT', flightArr: 'HKG', flightArrTime: '21:00', flightDuration: '4h 30m', note: '起飛回港，結束美好旅程', transTime: '0', transMode: 'transit' }
+        ];
+
+        const events = ref([...defaultEvents]);
+
+        const connectToSupabase = async () => {
+            try {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                const { data, error } = await supabaseClient
+                    .from('trips')
+                    .select('*')
+                    .eq('room_id', FIXED_ROOM_ID)
+                    .maybeSingle();
+
+                if (data && data.events) {
+                    events.value = data.events;
+                    localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
+                }
+                isSynced.value = true;
+
+                if (cloudChannel) supabaseClient.removeChannel(cloudChannel);
+                cloudChannel = supabaseClient
+                    .channel(`public:trips:viewer_${FIXED_ROOM_ID}`)
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips', filter: `room_id=eq.${FIXED_ROOM_ID}` }, (payload) => {
+                        const next = payload.new;
+                        if (next && next.events) {
+                            events.value = next.events;
+                            localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
+                        }
+                    })
+                    .subscribe();
+            } catch (err) {
+                console.error("雲端連線失敗", err);
+                const localEvt = localStorage.getItem('trip_events_viewer');
+                if (localEvt) events.value = JSON.parse(localEvt);
+                isSynced.value = false;
+            }
+        };
+
+        const fetchTokyoWeatherForecast = async () => {
+            try {
+                const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=precipitation_probability&timezone=Asia%2FTokyo");
+                const data = await res.json();
+                
+                if (data && data.daily) {
+                    const db = {};
+                    data.daily.time.forEach((dateStr, index) => {
+                        const code = data.daily.weather_code[index];
+                        const maxTemp = Math.round(data.daily.temperature_2m_max[index]);
+                        const minTemp = Math.round(data.daily.temperature_2m_min[index]);
+                        const pop = data.daily.precipitation_probability_max[index];
+                        
+                        let desc = "多雲時晴"; let icon = "⛅"; let badgeClass = "bg-amber-500";
+                        if (code === 0) { desc = "晴朗無雲"; icon = "☀️"; badgeClass = "bg-orange-500"; }
+                        else if (code >= 1 && code <= 3) { desc = "晴間多雲"; icon = "🌤️"; badgeClass = "bg-sky-500"; }
+                        else if (code >= 45 && code <= 48) { desc = "大霧籠罩"; icon = "🌫️"; badgeClass = "bg-slate-500"; }
+                        else if (code >= 51 && code <= 67) { desc = "有雨偏涼"; icon = "🌧️"; badgeClass = "bg-rose-500"; }
+                        else if (code >= 71 && code <= 77) { desc = "有雪注意"; icon = "❄️"; badgeClass = "bg-indigo-400"; }
+                        else if (code >= 80 && code <= 82) { desc = "短暫陣雨"; icon = "🌦️"; badgeClass = "bg-violet-500"; }
+
+                        db[dateStr] = {
+                            typeTitle: '📅 預報模式',
+                            badgeClass: badgeClass,
+                            icon: icon,
+                            desc: `當天預計${desc}，出門記得確認穿搭！`,
+                            tempInfo: `${minTemp}°C ~ ${maxTemp}°C`,
+                            pop: pop
+                        };
+                    });
+
+                    if (data.current) {
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        const currentTemp = Math.round(data.current.temperature_2m);
+                        const code = data.current.weather_code;
+                        const currentHour = new Date().getHours();
+                        const currentPop = data.hourly ? data.hourly.precipitation_probability[currentHour] : 0;
+                        
+                        let desc = "多雲時晴"; let icon = "⛅"; let badgeClass = "bg-amber-500";
+                        if (code === 0) { desc = "晴朗無雲"; icon = "☀️"; badgeClass = "bg-orange-500"; }
+                        else if (code >= 1 && code <= 3) { desc = "晴間多雲"; icon = "🌤️"; badgeClass = "bg-sky-500"; }
+                        else if (code >= 45 && code <= 48) { desc = "大霧"; icon = "🌫️"; badgeClass = "bg-slate-500"; }
+                        else if (code >= 51 && code <= 67) { desc = "正在下雨"; icon = "🌧️"; badgeClass = "bg-rose-500"; }
+                        else if (code >= 71 && code <= 77) { desc = "正在下雪"; icon = "❄️"; badgeClass = "bg-indigo-400"; }
+                        else if (code >= 80 && code <= 82) { desc = "陣雨來襲"; icon = "🌦️"; badgeClass = "bg-violet-500"; }
+
+                        db[todayStr] = {
+                            typeTitle: '🇯🇵 現場即時',
+                            badgeClass: badgeClass,
+                            icon: icon,
+                            desc: `目前東京正值${desc}，多機連線運作中！`,
+                            tempInfo: `${currentTemp}°C`,
+                            pop: currentPop
+                        };
+                    }
+                    weatherDatabase.value = db;
+                }
+            } catch (err) {
+                console.error("預報資料讀取失敗:", err);
+            }
+        };
+
+        const activeWeather = computed(() => {
+            const targetDayObj = days[selectedDay.value];
+            if (!targetDayObj) return { typeTitle: '⏳ 載入中', badgeClass: 'bg-slate-400', icon: '⏳', desc: '正在準備資料...', tempInfo: '--°C', pop: null };
+            const targetDateStr = targetDayObj.dateStr;
+            
+            if (weatherDatabase.value && weatherDatabase.value[targetDateStr]) {
+                return weatherDatabase.value[targetDateStr];
+            }
+            
+            const month = parseInt(targetDateStr.split('-')[1]);
+            if (month >= 6 && month <= 8) {
+                return {
+                    typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-emerald-500', icon: '🌿',
+                    desc: '東京初夏梅雨交替期，常有短暫陣雨，建議攜帶輕便摺疊傘！', tempInfo: '20°C ~ 26°C', pop: 45
+                };
+            } else if (month >= 9 && month <= 11) {
+                return {
+                    typeTitle: '🍁 當季天氣預測', badgeClass: 'bg-orange-500', icon: '🍁',
+                    desc: '東京秋高氣爽，氣候非常舒適乾燥，適合戶外逛街健行！', tempInfo: '15°C ~ 22°C', pop: 25
+                };
+            } else if (month === 12 || month === 1 || month === 2) {
+                return {
+                    typeTitle: '❄️ 當季天氣預測', badgeClass: 'bg-sky-600', icon: '❄️',
+                    desc: '東京冬季寒冷乾燥、晴天率高，出門請加強防風羽絨外套保暖！', tempInfo: '3°C ~ 10°C', pop: 10
+                };
+            } else {
+                return {
+                    typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-pink-400', icon: '🌸',
+                    desc: '東京春暖花開櫻花季，日夜溫差較大，建議採用洋蔥式穿搭法！', tempInfo: '10°C ~ 18°C', pop: 35
+                };
+            }
+        });
+
+        const currentDayEvents = computed(() => events.value.filter(e => e.dayIdx === selectedDay.value));
+        const getPrevDayHotel = (day) => day === 0 ? null : "東京淺草橫綱Hotel";
+        const triggerGoogleMap = (loc) => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`, '_blank');
+        const getCategoryClass = (cat) => ({ '景點':'bg-rose-100 text-rose-700','住宿':'bg-emerald-100 text-emerald-700','美食':'bg-amber-100 text-amber-700' }[cat] || 'bg-slate-100');
+
+        onMounted(() => {
+            fetchTokyoWeatherForecast();
+            connectToSupabase();
+        });
+
+        return { 
+            currentTab, selectedDay, exchangeRate, calcInputJPY, tabs, days, activeWeather, 
+            currentDayEvents, triggerGoogleMap, getCategoryClass, getPrevDayHotel, isSynced
+        };
+    }
+}).mount('#app');
+</script>
+
+</body>
+</html>
