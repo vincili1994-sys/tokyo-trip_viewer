@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>東京私旅 - 純行程分享版</title>
+    <title>東京私旅 - 行程管理版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     
+    <!-- 🌟 引入 Supabase 官方網頁版 SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
@@ -32,7 +32,7 @@
 </head>
 <body class="text-slate-700 antialiased">
 
-<div id="app" class="max-w-md mx-auto min-h-screen bg-chiikawa flex flex-col shadow-2xl relative pb-24 overflow-x-hidden">
+<div id="app" class="max-w-md mx-auto min-h-screen bg-chiikawa flex flex-col shadow-2xl relative pb-28 overflow-x-hidden">
     
     <header class="bg-sky-950 p-5 pt-6 pb-3 sticky top-0 z-40 border-b border-sky-900 shadow-md">
         <div class="flex justify-between items-center mb-2">
@@ -47,6 +47,7 @@
             </div>
         </div>
 
+        <!-- 🌟 雲端連線狀態列 -->
         <div class="flex items-center justify-between bg-sky-900/40 p-2 rounded-xl border border-sky-800 text-xs my-1">
             <span class="text-amber-200 font-bold flex-shrink-0">🌐 雲端多機同步狀態：</span>
             <div class="flex items-center gap-1.5">
@@ -71,8 +72,10 @@
 
     <main class="flex-1 p-4">
 
+        <!-- 1. 每日行程頁面 -->
         <div v-if="currentTab === 'itinerary'" class="space-y-4 animate-fade-in">
             
+            <!-- 天氣區塊 -->
             <div class="bg-white/85 backdrop-blur-md rounded-2xl p-4 border border-rose-100 shadow-sm flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">{{ activeWeather.icon }}</span>
@@ -97,15 +100,21 @@
                 <span class="text-xs text-amber-100 font-medium">✨ 今日主題：{{ days[selectedDay]?.title }} ✨</span>
             </div>
 
-            <div id="drag-container" class="space-y-3 relative">
-                <div v-for="(event, idx) in currentDayEvents" :key="event.id" :data-id="event.id" class="relative">
+            <div class="space-y-3 relative">
+                <div v-for="(event, idx) in currentDayEvents" :key="event.id" class="relative">
                     
-                    <div v-if="idx > 0 || (selectedDay > 0 && getPrevDayHotel(selectedDay))" class="my-3 mx-4 flex items-center justify-between bg-white/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-slate-200/60 text-xs text-slate-500">
-                        <div class="flex items-center gap-1.5 font-medium">
-                            <span v-if="event.transMode === 'walk'">🚶‍♂️ 步行</span>
-                            <span v-else-if="event.transMode === 'drive'">🚗 開車</span>
-                            <span v-else>🚌 大眾運輸</span>
-                            <span>往目的地約 {{ event.transTime || '20' }} 分鐘</span>
+                    <!-- 🚌 可切換的交通時間提示區塊 -->
+                    <div v-if="idx > 0 || (selectedDay > 0 && getPrevDayHotel(selectedDay))" class="my-3 mx-2 flex items-center justify-between bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl border border-slate-200/60 shadow-sm text-xs">
+                        <div class="flex items-center gap-1 text-slate-500 font-medium">
+                            <span>前一站往這大約</span>
+                            <input type="number" v-model.number="event.transTime" @change="updateEventsCloud" class="w-10 text-center font-bold text-sky-900 bg-sky-50 border border-sky-200 rounded p-0.5 focus:outline-none">
+                            <span>分鐘</span>
+                        </div>
+                        <!-- 交通工具切換按鈕群 -->
+                        <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <button @click="setTransMode(event, 'transit')" :class="event.transMode === 'transit' ? 'bg-sky-900 text-white shadow-sm' : 'text-slate-400'" class="px-2 py-1 rounded-md text-xs transition-all">🚌</button>
+                            <button @click="setTransMode(event, 'drive')" :class="event.transMode === 'drive' ? 'bg-sky-900 text-white shadow-sm' : 'text-slate-400'" class="px-2 py-1 rounded-md text-xs transition-all">🚗</button>
+                            <button @click="setTransMode(event, 'walk')" :class="event.transMode === 'walk' ? 'bg-sky-900 text-white shadow-sm' : 'text-slate-400'" class="px-2 py-1 rounded-md text-xs transition-all">🚶‍♂️</button>
                         </div>
                     </div>
 
@@ -113,10 +122,11 @@
                         🏨 起點：{{ getPrevDayHotel(selectedDay) }}
                     </div>
 
-                    <div v-if="event.category === '航班'" class="bg-gradient-to-r from-sky-900 to-indigo-950 text-white p-4 rounded-2xl shadow-md">
+                    <!-- 航班卡片 -->
+                    <div v-if="event.category === '航班'" @click="openEditModal(event)" class="bg-gradient-to-r from-sky-900 to-indigo-950 text-white p-4 rounded-2xl shadow-md cursor-pointer hover:scale-[1.01] transition-transform">
                         <div class="flex justify-between items-center mb-2">
                             <span class="bg-amber-400 text-sky-950 font-bold text-[10px] px-2 py-0.5 rounded-full">✈️ 航班資訊</span>
-                            <span class="text-xs font-mono text-sky-200">{{ event.flightNum }}</span>
+                            <span class="text-xs font-mono text-sky-200">{{ event.flightNum }} (點擊編輯)</span>
                         </div>
                         <div class="grid grid-cols-3 items-center text-center my-2">
                             <div><span class="text-xl font-black block">{{ event.flightDep }}</span><span class="text-xs text-sky-200">{{ event.time }}</span></div>
@@ -126,7 +136,8 @@
                         <p v-if="event.note" class="text-xs text-sky-200/90 bg-white/10 p-2 rounded-xl mt-2 whitespace-pre-line">{{ event.note }}</p>
                     </div>
 
-                    <div v-else class="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-rose-50 shadow-sm transition-all">
+                    <!-- 一般景點卡片 -->
+                    <div v-else @click="openEditModal(event)" class="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-rose-50 shadow-sm transition-all cursor-pointer hover:border-sky-300">
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex items-center gap-1.5">
                                 <span class="text-xs font-bold px-2 py-0.5 rounded-md" :class="getCategoryClass(event.category)">{{ event.category }}</span>
@@ -143,9 +154,16 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 當今日沒有行程時的防空提示 -->
+            <div v-if="currentDayEvents.length === 0" class="text-center py-12 bg-white/60 backdrop-blur-sm rounded-2xl border border-dashed border-slate-300 text-slate-400 text-sm">
+                🫙 這裡今天還空空的，點右下角加號排行程吧！
+            </div>
         </div>
 
+        <!-- 2. 旅遊資訊頁面 -->
         <div v-if="currentTab === 'info'" class="space-y-4 animate-fade-in">
+            <!-- 匯率換算 -->
             <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200 shadow-sm">
                 <h3 class="text-sm font-bold text-amber-900 mb-3">🪙 港幣即時換算 (1 JPY = {{ exchangeRate }} HKD)</h3>
                 <div class="grid grid-cols-2 gap-3">
@@ -154,6 +172,7 @@
                 </div>
             </div>
 
+            <!-- 酒店資訊 -->
             <div class="bg-white/90 p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <h3 class="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">🏨 酒店資訊</h3>
                 <p class="text-xs text-slate-600"><strong>名稱：</strong>東京淺草橫綱Hotel (Yokokuna Hotel Asakusa)</p>
@@ -161,6 +180,7 @@
                 <button @click="triggerGoogleMap('Asakusa Yokozuna Hotel')" class="w-full mt-2 py-2 bg-sky-900 text-amber-100 font-bold text-xs rounded-lg shadow-sm">開啟 Google Maps</button>
             </div>
 
+            <!-- 緊急求助 -->
             <div class="bg-red-50 p-4 rounded-2xl border border-red-200">
                 <h3 class="text-sm font-bold text-red-900 mb-2">🚨 緊急求助</h3>
                 <div class="grid grid-cols-2 gap-2 text-xs font-bold">
@@ -172,16 +192,96 @@
 
     </main>
 
+    <!-- 🌟 右下角新增行程浮動按鈕 (FAB) -->
+    <button v-if="currentTab === 'itinerary'" @click="openAddModal" class="fixed bottom-24 right-5 w-14 h-14 bg-sky-900 text-amber-100 rounded-full flex items-center justify-center text-3xl shadow-xl border-2 border-amber-200 z-40 active:scale-95 transition-transform font-bold">
+        ＋
+    </button>
+
+    <!-- 底部導航 -->
     <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 flex justify-around py-3 px-2">
         <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-sky-900 font-bold' : 'text-slate-400'" class="flex flex-col items-center flex-1 focus:outline-none">
             <span class="text-xl">{{ tab.icon }}</span><span class="text-[10px] mt-1">{{ tab.name }}</span>
         </button>
     </nav>
 
+    <!-- 🌟 行程新增/修改 彈出視窗 (Modal) -->
+    <div v-if="showModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
+        <div class="bg-white max-w-md w-full rounded-t-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-base font-bold text-slate-800">{{ isEditing ? '📝 修改行程內容' : '✨ 新增景點行程' }}</h3>
+                <button @click="showModal = false" class="text-slate-400 font-bold text-lg px-2">✕</button>
+            </div>
+
+            <!-- 分類選擇 -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1.5">行程類別</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button v-for="cat in ['景點','美食','住宿','航班']" :key="cat" @click="form.category = cat" :class="form.category === cat ? 'bg-sky-950 text-white font-bold' : 'bg-slate-100 text-slate-600'" class="py-2 rounded-xl text-xs border transition-all">
+                        {{ cat }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 核心欄位 -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">⏰ 出發/預約時間</label>
+                    <input type="time" v-model="form.time" class="w-full text-sm p-2.5 bg-slate-50 border rounded-xl focus:outline-none focus:border-sky-800 font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">📍 地點/名稱</label>
+                    <input type="text" v-model="form.location" placeholder="例如: 淺草寺" class="w-full text-sm p-2.5 bg-slate-50 border rounded-xl focus:outline-none focus:border-sky-800">
+                </div>
+            </div>
+
+            <!-- 航班特有欄位 -->
+            <div v-if="form.category === '航班'" class="bg-sky-50 p-3 rounded-2xl border border-sky-100 space-y-2.5 animate-fade-in">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" v-model="form.flightNum" placeholder="航班號碼 (HX608)" class="text-xs p-2 bg-white border rounded-lg">
+                    <input type="text" v-model="form.flightDuration" placeholder="飛行時間 (4h 15m)" class="text-xs p-2 bg-white border rounded-lg">
+                </div>
+                <div class="grid grid-cols-4 gap-1.5 items-center text-center text-xs">
+                    <input type="text" v-model="form.flightDep" placeholder="起飛 (HKG)" class="p-2 border rounded-lg text-center font-bold">
+                    <span class="text-slate-400">✈️</span>
+                    <input type="text" v-model="form.flightArr" placeholder="降落 (NRT)" class="p-2 border rounded-lg text-center font-bold">
+                    <input type="time" v-model="form.flightArrTime" class="p-2 border rounded-lg text-center">
+                </div>
+            </div>
+
+            <!-- 附加資訊 -->
+            <div v-else class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">🕒 營業時間 (選填)</label>
+                    <input type="text" v-model="form.openTime" placeholder="10:00-20:00" class="w-full text-xs p-2.5 bg-slate-50 border rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">🎫 門票/備註 (選填)</label>
+                    <input type="text" v-model="form.ticketPrice" placeholder="現場排隊/免門票" class="w-full text-xs p-2.5 bg-slate-50 border rounded-xl">
+                </div>
+            </div>
+
+            <!-- 備註說明 -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">📝 貼心提醒 / 詳細備註</label>
+                <textarea v-model="form.note" rows="3" placeholder="輸入此行程需要注意的事情、必買手信或必吃美食..." class="w-full text-xs p-2.5 bg-slate-50 border rounded-xl focus:outline-none focus:border-sky-800"></textarea>
+            </div>
+
+            <!-- 功能按鈕區 -->
+            <div class="flex gap-3 pt-2">
+                <button v-if="isEditing" @click="deleteEvent" class="px-4 py-3 bg-rose-50 text-rose-600 font-bold text-xs rounded-xl border border-rose-200">
+                    🗑️ 刪除
+                </button>
+                <button @click="saveEvent" class="flex-1 py-3 bg-sky-950 text-amber-100 font-bold text-xs rounded-xl shadow-md text-center">
+                    💾 儲存並同步到雲端
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-const { createApp, ref, computed, onMounted, nextTick } = Vue;
+const { createApp, ref, computed, onMounted } = Vue;
 
 const SUPABASE_URL = "https://vumrenvgdbjeaiuvnuzx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1bXJlbnZnZGJqZWFpdXZudXp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNTI4NDcsImV4cCI6MjA5NjYyODg0N30.Rn_WmoNaz1-PfHDznfJY0g_UU-kWs3UR4Wd5e2SchEo";
@@ -199,6 +299,14 @@ createApp({
         let cloudChannel = null;
 
         const weatherDatabase = ref({});
+        const showModal = ref(false);
+        const isEditing = ref(false);
+        const currentEditingId = ref(null);
+
+        const form = ref({
+            category: '景點', time: '10:00', location: '', note: '', openTime: '', ticketPrice: '',
+            flightNum: '', flightDep: 'HKG', flightArr: 'NRT', flightDuration: '', flightArrTime: ''
+        });
 
         const days = [
             { weekShort:'Mon', dateNum:'15', title:'抵達與淺草寺散步', dateStr: '2026-06-15' },
@@ -208,27 +316,27 @@ createApp({
             { weekShort:'Fri', dateNum:'19', title:'成田機場回港', dateStr: '2026-06-19' }
         ];
 
-        // 🌟 導航分頁清單已簡化為兩個
         const tabs = [
             {id:'itinerary', name:'每日行程', icon:'📍'}, 
             {id:'info', name:'旅遊資訊', icon:'ℹ️'}
         ];
         
         const defaultEvents = [
-            { id: 1, dayIdx: 0, category: '航班', location: '成田空港', time: '14:55', flightNum: 'HX608', flightDep: 'HKG', flightArr: 'NRT', flightArrTime: '20:10', flightDuration: '4h 15m', note: '抵達成田空港\n辦理入境提取行李。', transTime: '50', transMode: 'transit' },
-            { id: 2, dayIdx: 0, category: '住宿', location: '東京淺草橫綱Hotel', time: '21:30', note: '辦理入住手續', transTime: '15', transMode: 'walk' },
-            { id: 3, dayIdx: 0, category: '美食', location: '淺草附近拉麵/居酒屋', time: '22:00', note: '宵夜與放鬆', transTime: '0', transMode: 'walk' },
-            { id: 4, dayIdx: 1, category: '景點', location: '御殿場 Premium Outlets', time: '10:00', openTime: '10:00-20:00', note: '瘋狂購物行程！', transTime: '120', transMode: 'drive' },
-            { id: 5, dayIdx: 2, category: '美食', location: '築地場外市場', time: '08:30', note: '早餐享用海鮮丼與玉子燒', transTime: '30', transMode: 'transit' },
-            { id: 6, dayIdx: 2, category: '景點', location: '分頭活動 / 自由逛街', time: '13:00', note: '各自安排想去的景點', transTime: '40', transMode: 'transit' },
-            { id: 7, dayIdx: 3, category: '景點', location: '東京晴空塔 (SKYTREE)', time: '09:35', ticketPrice: '已預約 09:30 門票', note: '登高看東京全景', transTime: '30', transMode: 'transit' },
-            { id: 8, dayIdx: 3, category: '景點', location: '銀座 / 有樂町散策', time: '14:00', note: '逛街精品、無印良品旗艦店', transTime: '25', transMode: 'transit' },
-            { id: 9, dayIdx: 4, category: '景點', location: '淺草寺周邊最後巡禮', time: '09:00', note: '買手信、補貨', transTime: '60', transMode: 'transit' },
-            { id: 10, dayIdx: 4, category: '航班', location: '成田空港', time: '15:30', flightNum: 'HX609', flightDep: 'NRT', flightArr: 'HKG', flightArrTime: '21:00', flightDuration: '4h 30m', note: '起飛回港，結束美好旅程', transTime: '0', transMode: 'transit' }
+            { id: 1, dayIdx: 0, category: '航班', location: '成田空港', time: '14:55', flightNum: 'HX608', flightDep: 'HKG', flightArr: 'NRT', flightArrTime: '20:10', flightDuration: '4h 15m', note: '抵達成田空港\n辦理入境提取行李。', transTime: 50, transMode: 'transit' },
+            { id: 2, dayIdx: 0, category: '住宿', location: '東京淺草橫綱Hotel', time: '21:30', note: '辦理入住手續', transTime: 15, transMode: 'walk' },
+            { id: 3, dayIdx: 0, category: '美食', location: '淺草附近拉麵/居酒屋', time: '22:00', note: '宵夜與放鬆', transTime: 0, transMode: 'walk' },
+            { id: 4, dayIdx: 1, category: '景點', location: '御殿場 Premium Outlets', time: '10:00', openTime: '10:00-20:00', note: '瘋狂購物行程！', transTime: 120, transMode: 'drive' },
+            { id: 5, dayIdx: 2, category: '美食', location: '築地場外市場', time: '08:30', note: '早餐享用海鮮丼與玉子燒', transTime: 30, transMode: 'transit' },
+            { id: 6, dayIdx: 2, category: '景點', location: '分頭活動 / 自由逛街', time: '13:00', note: '各自安排想去的景點', transTime: 40, transMode: 'transit' },
+            { id: 7, dayIdx: 3, category: '景點', location: '東京晴空塔 (SKYTREE)', time: '09:35', ticketPrice: '已預約 09:30 門票', note: '登高看東京全景', transTime: 30, transMode: 'transit' },
+            { id: 8, dayIdx: 3, category: '景點', location: '銀座 / 有樂町散策', time: '14:00', note: '逛街精品、無印良品旗艦店', transTime: 25, transMode: 'transit' },
+            { id: 9, dayIdx: 4, category: '景點', location: '淺草寺周邊最後巡禮', time: '09:00', note: '買手信、補貨', transTime: 60, transMode: 'transit' },
+            { id: 10, dayIdx: 4, category: '航班', location: '成田空港', time: '15:30', flightNum: 'HX609', flightDep: 'NRT', flightArr: 'HKG', flightArrTime: '21:00', flightDuration: '4h 30m', note: '起飛回港，結束美好旅程', transTime: 0, transMode: 'transit' }
         ];
 
         const events = ref([...defaultEvents]);
 
+        // 連線到 Supabase 雲端
         const connectToSupabase = async () => {
             try {
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -263,6 +371,83 @@ createApp({
             }
         };
 
+        // 更新資料到雲端
+        const updateEventsCloud = async () => {
+            // 排序確保時間順序正確
+            events.value.sort((a, b) => a.time.localeCompare(b.time));
+            localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
+            
+            if (supabaseClient) {
+                await supabaseClient.from('trips').upsert({
+                    room_id: FIXED_ROOM_ID,
+                    events: events.value,
+                    updated_at: new Date()
+                }, { onConflict: 'room_id' });
+            }
+        };
+
+        // 交通切換事件
+        const setTransMode = (event, mode) => {
+            event.transMode = mode;
+            updateEventsCloud();
+        };
+
+        // 打開新增 Modal
+        const openAddModal = () => {
+            isEditing.value = false;
+            currentEditingId.value = null;
+            form.value = {
+                category: '景點', time: '12:00', location: '', note: '', openTime: '', ticketPrice: '',
+                flightNum: '', flightDep: 'HKG', flightArr: 'NRT', flightDuration: '', flightArrTime: ''
+            };
+            showModal.value = true;
+        };
+
+        // 打開編輯 Modal
+        const openEditModal = (event) => {
+            isEditing.value = true;
+            currentEditingId.value = event.id;
+            form.value = { ...event };
+            showModal.value = true;
+        };
+
+        // 儲存事件
+        const saveEvent = () => {
+            if (!form.value.location) {
+                alert("請填寫地點或名稱！");
+                return;
+            }
+
+            if (isEditing.value) {
+                const index = events.value.findIndex(e => e.id === currentEditingId.value);
+                if (index !== -1) {
+                    events.value[index] = { ...form.value, id: currentEditingId.value, dayIdx: selectedDay.value };
+                }
+            } else {
+                const newId = events.value.length > 0 ? Math.max(...events.value.map(e => e.id)) + 1 : 1;
+                events.value.push({
+                    ...form.value,
+                    id: newId,
+                    dayIdx: selectedDay.value,
+                    transTime: 20,
+                    transMode: 'transit'
+                });
+            }
+
+            updateEventsCloud();
+            showModal.value = false;
+        };
+
+        // 刪除事件
+        const deleteEvent = () => {
+            if (confirm("確定要刪除這個行程嗎？")) {
+                events.value = events.value.filter(e => e.id !== currentEditingId.value);
+                updateEventsCloud();
+                showModal.value = false;
+            }
+        };
+
+        // 抓取天氣 API
         const fetchTokyoWeatherForecast = async () => {
             try {
                 const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=precipitation_probability&timezone=Asia%2FTokyo");
@@ -285,12 +470,8 @@ createApp({
                         else if (code >= 80 && code <= 82) { desc = "短暫陣雨"; icon = "🌦️"; badgeClass = "bg-violet-500"; }
 
                         db[dateStr] = {
-                            typeTitle: '📅 預報模式',
-                            badgeClass: badgeClass,
-                            icon: icon,
-                            desc: `當天預計${desc}，出門記得確認穿搭！`,
-                            tempInfo: `${minTemp}°C ~ ${maxTemp}°C`,
-                            pop: pop
+                            typeTitle: '📅 預報模式', badgeClass: badgeClass, icon: icon,
+                            desc: `當天預計${desc}，出門記得確認穿搭！`, tempInfo: `${minTemp}°C ~ ${maxTemp}°C`, pop: pop
                         };
                     });
 
@@ -310,12 +491,8 @@ createApp({
                         else if (code >= 80 && code <= 82) { desc = "陣雨來襲"; icon = "🌦️"; badgeClass = "bg-violet-500"; }
 
                         db[todayStr] = {
-                            typeTitle: '🇯🇵 現場即時',
-                            badgeClass: badgeClass,
-                            icon: icon,
-                            desc: `目前東京正值${desc}，多機連線運作中！`,
-                            tempInfo: `${currentTemp}°C`,
-                            pop: currentPop
+                            typeTitle: '🇯🇵 現場即時', badgeClass: badgeClass, icon: icon,
+                            desc: `目前東京正值${desc}，多機連線運作中！`, tempInfo: `${currentTemp}°C`, pop: currentPop
                         };
                     }
                     weatherDatabase.value = db;
@@ -336,25 +513,13 @@ createApp({
             
             const month = parseInt(targetDateStr.split('-')[1]);
             if (month >= 6 && month <= 8) {
-                return {
-                    typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-emerald-500', icon: '🌿',
-                    desc: '東京初夏梅雨交替期，常有短暫陣雨，建議攜帶輕便摺疊傘！', tempInfo: '20°C ~ 26°C', pop: 45
-                };
+                return { typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-emerald-500', icon: '🌿', desc: '東京初夏梅雨交替期，常有短暫陣雨，建議攜帶輕便摺疊傘！', tempInfo: '20°C ~ 26°C', pop: 45 };
             } else if (month >= 9 && month <= 11) {
-                return {
-                    typeTitle: '🍁 當季天氣預測', badgeClass: 'bg-orange-500', icon: '🍁',
-                    desc: '東京秋高氣爽，氣候非常舒適乾燥，適合戶外逛街健行！', tempInfo: '15°C ~ 22°C', pop: 25
-                };
+                return { typeTitle: '🍁 當季天氣預測', badgeClass: 'bg-orange-500', icon: '🍁', desc: '東京秋高氣爽，氣候非常舒適乾燥，適合戶外逛街健行！', tempInfo: '15°C ~ 22°C', pop: 25 };
             } else if (month === 12 || month === 1 || month === 2) {
-                return {
-                    typeTitle: '❄️ 當季天氣預測', badgeClass: 'bg-sky-600', icon: '❄️',
-                    desc: '東京冬季寒冷乾燥、晴天率高，出門請加強防風羽絨外套保暖！', tempInfo: '3°C ~ 10°C', pop: 10
-                };
+                return { typeTitle: '❄️ 當季天氣預測', badgeClass: 'bg-sky-600', icon: '❄️', desc: '東京冬季寒冷乾燥、晴天率高，出門請加強防風羽絨外套保暖！', tempInfo: '3°C ~ 10°C', pop: 10 };
             } else {
-                return {
-                    typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-pink-400', icon: '🌸',
-                    desc: '東京春暖花開櫻花季，日夜溫差較大，建議採用洋蔥式穿搭法！', tempInfo: '10°C ~ 18°C', pop: 35
-                };
+                return { typeTitle: '🌸 當季天氣預測', badgeClass: 'bg-pink-400', icon: '🌸', desc: '東京春暖花開櫻花季，日夜溫差較大，建議採用洋蔥式穿搭法！', tempInfo: '10°C ~ 18°C', pop: 35 };
             }
         });
 
@@ -370,7 +535,8 @@ createApp({
 
         return { 
             currentTab, selectedDay, exchangeRate, calcInputJPY, tabs, days, activeWeather, 
-            currentDayEvents, triggerGoogleMap, getCategoryClass, getPrevDayHotel, isSynced
+            currentDayEvents, triggerGoogleMap, getCategoryClass, getPrevDayHotel, isSynced,
+            showModal, isEditing, form, openAddModal, openEditModal, saveEvent, deleteEvent, setTransMode, updateEventsCloud
         };
     }
 }).mount('#app');
