@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     
-    <!-- 🌟 引入 Supabase 官方網頁版 SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
@@ -28,6 +27,16 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; overflow-x: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
         .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 🌟 2. 徹底隱藏交通時間數字輸入框的原生上下拉箭頭 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body class="text-slate-700 antialiased">
@@ -47,7 +56,6 @@
             </div>
         </div>
 
-        <!-- 🌟 雲端連線狀態列 -->
         <div class="flex items-center justify-between bg-sky-900/40 p-2 rounded-xl border border-sky-800 text-xs my-1">
             <span class="text-amber-200 font-bold flex-shrink-0">🌐 雲端多機同步狀態：</span>
             <div class="flex items-center gap-1.5">
@@ -72,10 +80,8 @@
 
     <main class="flex-1 p-4">
 
-        <!-- 1. 每日行程頁面 -->
         <div v-if="currentTab === 'itinerary'" class="space-y-4 animate-fade-in">
             
-            <!-- 天氣區塊 -->
             <div class="bg-white/85 backdrop-blur-md rounded-2xl p-4 border border-rose-100 shadow-sm flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">{{ activeWeather.icon }}</span>
@@ -103,14 +109,12 @@
             <div class="space-y-3 relative">
                 <div v-for="(event, idx) in currentDayEvents" :key="event.id" class="relative">
                     
-                    <!-- 🚌 可切換的交通時間提示區塊 -->
                     <div v-if="idx > 0 || (selectedDay > 0 && getPrevDayHotel(selectedDay))" class="my-3 mx-2 flex items-center justify-between bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl border border-slate-200/60 shadow-sm text-xs">
                         <div class="flex items-center gap-1 text-slate-500 font-medium">
                             <span>前一站往這大約</span>
                             <input type="number" v-model.number="event.transTime" @change="updateEventsCloud" class="w-10 text-center font-bold text-sky-900 bg-sky-50 border border-sky-200 rounded p-0.5 focus:outline-none">
                             <span>分鐘</span>
                         </div>
-                        <!-- 交通工具切換按鈕群 -->
                         <div class="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                             <button @click="setTransMode(event, 'transit')" :class="event.transMode === 'transit' ? 'bg-sky-900 text-white shadow-sm' : 'text-slate-400'" class="px-2 py-1 rounded-md text-xs transition-all">🚌</button>
                             <button @click="setTransMode(event, 'drive')" :class="event.transMode === 'drive' ? 'bg-sky-900 text-white shadow-sm' : 'text-slate-400'" class="px-2 py-1 rounded-md text-xs transition-all">🚗</button>
@@ -122,7 +126,6 @@
                         🏨 起點：{{ getPrevDayHotel(selectedDay) }}
                     </div>
 
-                    <!-- 航班卡片 -->
                     <div v-if="event.category === '航班'" @click="openEditModal(event)" class="bg-gradient-to-r from-sky-900 to-indigo-950 text-white p-4 rounded-2xl shadow-md cursor-pointer hover:scale-[1.01] transition-transform">
                         <div class="flex justify-between items-center mb-2">
                             <span class="bg-amber-400 text-sky-950 font-bold text-[10px] px-2 py-0.5 rounded-full">✈️ 航班資訊</span>
@@ -136,7 +139,6 @@
                         <p v-if="event.note" class="text-xs text-sky-200/90 bg-white/10 p-2 rounded-xl mt-2 whitespace-pre-line">{{ event.note }}</p>
                     </div>
 
-                    <!-- 一般景點卡片 -->
                     <div v-else @click="openEditModal(event)" class="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-rose-50 shadow-sm transition-all cursor-pointer hover:border-sky-300">
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex items-center gap-1.5">
@@ -155,15 +157,12 @@
                 </div>
             </div>
 
-            <!-- 當今日沒有行程時的防空提示 -->
             <div v-if="currentDayEvents.length === 0" class="text-center py-12 bg-white/60 backdrop-blur-sm rounded-2xl border border-dashed border-slate-300 text-slate-400 text-sm">
                 🫙 這裡今天還空空的，點右下角加號排行程吧！
             </div>
         </div>
 
-        <!-- 2. 旅遊資訊頁面 -->
         <div v-if="currentTab === 'info'" class="space-y-4 animate-fade-in">
-            <!-- 匯率換算 -->
             <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200 shadow-sm">
                 <h3 class="text-sm font-bold text-amber-900 mb-3">🪙 港幣即時換算 (1 JPY = {{ exchangeRate }} HKD)</h3>
                 <div class="grid grid-cols-2 gap-3">
@@ -172,7 +171,6 @@
                 </div>
             </div>
 
-            <!-- 酒店資訊 -->
             <div class="bg-white/90 p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <h3 class="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">🏨 酒店資訊</h3>
                 <p class="text-xs text-slate-600"><strong>名稱：</strong>東京淺草橫綱Hotel (Yokokuna Hotel Asakusa)</p>
@@ -180,7 +178,6 @@
                 <button @click="triggerGoogleMap('Asakusa Yokozuna Hotel')" class="w-full mt-2 py-2 bg-sky-900 text-amber-100 font-bold text-xs rounded-lg shadow-sm">開啟 Google Maps</button>
             </div>
 
-            <!-- 緊急求助 -->
             <div class="bg-red-50 p-4 rounded-2xl border border-red-200">
                 <h3 class="text-sm font-bold text-red-900 mb-2">🚨 緊急求助</h3>
                 <div class="grid grid-cols-2 gap-2 text-xs font-bold">
@@ -192,19 +189,16 @@
 
     </main>
 
-    <!-- 🌟 右下角新增行程浮動按鈕 (FAB) -->
     <button v-if="currentTab === 'itinerary'" @click="openAddModal" class="fixed bottom-24 right-5 w-14 h-14 bg-sky-900 text-amber-100 rounded-full flex items-center justify-center text-3xl shadow-xl border-2 border-amber-200 z-40 active:scale-95 transition-transform font-bold">
         ＋
     </button>
 
-    <!-- 底部導航 -->
     <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 flex justify-around py-3 px-2">
         <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="currentTab === tab.id ? 'text-sky-900 font-bold' : 'text-slate-400'" class="flex flex-col items-center flex-1 focus:outline-none">
             <span class="text-xl">{{ tab.icon }}</span><span class="text-[10px] mt-1">{{ tab.name }}</span>
         </button>
     </nav>
 
-    <!-- 🌟 行程新增/修改 彈出視窗 (Modal) -->
     <div v-if="showModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
         <div class="bg-white max-w-md w-full rounded-t-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl">
             <div class="flex justify-between items-center border-b pb-3">
@@ -212,7 +206,6 @@
                 <button @click="showModal = false" class="text-slate-400 font-bold text-lg px-2">✕</button>
             </div>
 
-            <!-- 分類選擇 -->
             <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1.5">行程類別</label>
                 <div class="grid grid-cols-4 gap-2">
@@ -222,7 +215,6 @@
                 </div>
             </div>
 
-            <!-- 核心欄位 -->
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">⏰ 出發/預約時間</label>
@@ -234,7 +226,6 @@
                 </div>
             </div>
 
-            <!-- 航班特有欄位 -->
             <div v-if="form.category === '航班'" class="bg-sky-50 p-3 rounded-2xl border border-sky-100 space-y-2.5 animate-fade-in">
                 <div class="grid grid-cols-2 gap-2">
                     <input type="text" v-model="form.flightNum" placeholder="航班號碼 (HX608)" class="text-xs p-2 bg-white border rounded-lg">
@@ -248,7 +239,6 @@
                 </div>
             </div>
 
-            <!-- 附加資訊 -->
             <div v-else class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">🕒 營業時間 (選填)</label>
@@ -260,13 +250,11 @@
                 </div>
             </div>
 
-            <!-- 備註說明 -->
             <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1">📝 貼心提醒 / 詳細備註</label>
                 <textarea v-model="form.note" rows="3" placeholder="輸入此行程需要注意的事情、必買手信或必吃美食..." class="w-full text-xs p-2.5 bg-slate-50 border rounded-xl focus:outline-none focus:border-sky-800"></textarea>
             </div>
 
-            <!-- 功能按鈕區 -->
             <div class="flex gap-3 pt-2">
                 <button v-if="isEditing" @click="deleteEvent" class="px-4 py-3 bg-rose-50 text-rose-600 font-bold text-xs rounded-xl border border-rose-200">
                     🗑️ 刪除
@@ -296,7 +284,6 @@ createApp({
         
         const isSynced = ref(false);
         let supabaseClient = null;
-        let cloudChannel = null;
 
         const weatherDatabase = ref({});
         const showModal = ref(false);
@@ -336,48 +323,37 @@ createApp({
 
         const events = ref([...defaultEvents]);
 
-        // 連線到 Supabase 雲端
-const connectToSupabase = async () => {
-    try {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        // 1. 初始化讀取
-        const { data, error } = await supabaseClient
-            .from('trips')
-            .select('*')
-            .eq('room_id', FIXED_ROOM_ID)
-            .maybeSingle();
+        // 🌟 3. 連線到 Supabase 雲端 (雙向即時監聽與對等儲存)
+        const connectToSupabase = async () => {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // 讀取初始資料
+            const { data } = await supabaseClient
+                .from('trips')
+                .select('events')
+                .eq('room_id', FIXED_ROOM_ID)
+                .maybeSingle();
 
-        if (data && data.events) {
-            events.value = data.events;
-            localStorage.setItem('trip_events_sync', JSON.stringify(events.value));
-        }
+            if (data && data.events) {
+                events.value = data.events;
+            }
+            isSynced.value = true;
 
-        // 2. 確保頻道名稱是唯一且統一的
-        if (cloudChannel) supabaseClient.removeChannel(cloudChannel);
-        
-        cloudChannel = supabaseClient
-            .channel('db-changes') // 使用統一的頻道名稱
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'trips', 
-                filter: `room_id=eq.${FIXED_ROOM_ID}` 
-            }, (payload) => {
-                // 收到遠端變更時，立即更新本地狀態
-                if (payload.new && payload.new.events) {
-                    events.value = payload.new.events;
-                    localStorage.setItem('trip_events_sync', JSON.stringify(events.value));
-                }
-            })
-            .subscribe();
-
-        isSynced.value = true;
-    } catch (err) {
-        console.error("雲端連線失敗", err);
-        isSynced.value = false;
-    }
-};
+            // 即時追蹤並實時同步更新數據 (無論哪一台設備修改都會瞬間渲染)
+            supabaseClient
+                .channel('any')
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'trips', 
+                    filter: `room_id=eq.${FIXED_ROOM_ID}` 
+                }, payload => {
+                    if (payload.new && payload.new.events) {
+                        events.value = payload.new.events;
+                    }
+                })
+                .subscribe();
+        };
 
         // 更新資料到雲端
         const updateEventsCloud = async () => {
@@ -386,11 +362,9 @@ const connectToSupabase = async () => {
             localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
             
             if (supabaseClient) {
-                await supabaseClient.from('trips').upsert({
-                    room_id: FIXED_ROOM_ID,
-                    events: events.value,
-                    updated_at: new Date()
-                }, { onConflict: 'room_id' });
+                await supabaseClient
+                    .from('trips')
+                    .upsert({ room_id: FIXED_ROOM_ID, events: events.value }, { onConflict: 'room_id' });
             }
         };
 
@@ -533,7 +507,7 @@ const connectToSupabase = async () => {
 
         const currentDayEvents = computed(() => events.value.filter(e => e.dayIdx === selectedDay.value));
         const getPrevDayHotel = (day) => day === 0 ? null : "東京淺草橫綱Hotel";
-        const triggerGoogleMap = (loc) => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`, '_blank');
+        const triggerGoogleMap = (loc) => window.open(`http://maps.google.com/?q=${encodeURIComponent(loc)}`, '_blank');
         const getCategoryClass = (cat) => ({ '景點':'bg-rose-100 text-rose-700','住宿':'bg-emerald-100 text-emerald-700','美食':'bg-amber-100 text-amber-700' }[cat] || 'bg-slate-100');
 
         onMounted(() => {
