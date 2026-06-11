@@ -337,39 +337,47 @@ createApp({
         const events = ref([...defaultEvents]);
 
         // 連線到 Supabase 雲端
-        const connectToSupabase = async () => {
-            try {
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                const { data, error } = await supabaseClient
-                    .from('trips')
-                    .select('*')
-                    .eq('room_id', FIXED_ROOM_ID)
-                    .maybeSingle();
+const connectToSupabase = async () => {
+    try {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // 1. 初始化讀取
+        const { data, error } = await supabaseClient
+            .from('trips')
+            .select('*')
+            .eq('room_id', FIXED_ROOM_ID)
+            .maybeSingle();
 
-                if (data && data.events) {
-                    events.value = data.events;
-                    localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
+        if (data && data.events) {
+            events.value = data.events;
+            localStorage.setItem('trip_events_sync', JSON.stringify(events.value));
+        }
+
+        // 2. 確保頻道名稱是唯一且統一的
+        if (cloudChannel) supabaseClient.removeChannel(cloudChannel);
+        
+        cloudChannel = supabaseClient
+            .channel('db-changes') // 使用統一的頻道名稱
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'trips', 
+                filter: `room_id=eq.${FIXED_ROOM_ID}` 
+            }, (payload) => {
+                // 收到遠端變更時，立即更新本地狀態
+                if (payload.new && payload.new.events) {
+                    events.value = payload.new.events;
+                    localStorage.setItem('trip_events_sync', JSON.stringify(events.value));
                 }
-                isSynced.value = true;
+            })
+            .subscribe();
 
-                if (cloudChannel) supabaseClient.removeChannel(cloudChannel);
-                cloudChannel = supabaseClient
-                    .channel(`public:trips:viewer_${FIXED_ROOM_ID}`)
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips', filter: `room_id=eq.${FIXED_ROOM_ID}` }, (payload) => {
-                        const next = payload.new;
-                        if (next && next.events) {
-                            events.value = next.events;
-                            localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
-                        }
-                    })
-                    .subscribe();
-            } catch (err) {
-                console.error("雲端連線失敗", err);
-                const localEvt = localStorage.getItem('trip_events_viewer');
-                if (localEvt) events.value = JSON.parse(localEvt);
-                isSynced.value = false;
-            }
-        };
+        isSynced.value = true;
+    } catch (err) {
+        console.error("雲端連線失敗", err);
+        isSynced.value = false;
+    }
+};
 
         // 更新資料到雲端
         const updateEventsCloud = async () => {
