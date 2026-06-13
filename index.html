@@ -28,7 +28,7 @@
         .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 🌟 2. 徹底隱藏交通時間數字輸入框的原生上下拉箭頭 */
+        /* 🌟 徹底隱藏交通時間數字輸入框的原生上下拉箭頭 */
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -82,6 +82,7 @@
 
         <div v-if="currentTab === 'itinerary'" class="space-y-4 animate-fade-in">
             
+            <!-- 天氣區塊：修正降雨率顯示判斷 -->
             <div class="bg-white/85 backdrop-blur-md rounded-2xl p-4 border border-rose-100 shadow-sm flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">{{ activeWeather.icon }}</span>
@@ -92,11 +93,11 @@
                         <p class="text-sm font-bold text-slate-700">{{ activeWeather.desc }}</p>
                     </div>
                 </div>
-                <div class="text-right">
+                <div class="text-right flex-shrink-0 pl-2">
                     <span class="text-base font-bold text-sky-900 block whitespace-nowrap">
                         {{ activeWeather.tempInfo }}
                     </span>
-                    <span v-if="activeWeather.pop !== null" class="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-md font-bold block mt-0.5 whitespace-nowrap">
+                    <span v-if="activeWeather.pop !== null && activeWeather.pop !== undefined" class="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-md font-bold block mt-0.5 whitespace-nowrap text-center">
                         💧 降雨率 {{ activeWeather.pop }}%
                     </span>
                 </div>
@@ -199,6 +200,7 @@
         </button>
     </nav>
 
+    <!-- 行程編輯/新增彈出視窗 -->
     <div v-if="showModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
         <div class="bg-white max-w-md w-full rounded-t-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl">
             <div class="flex justify-between items-center border-b pb-3">
@@ -323,7 +325,7 @@ createApp({
 
         const events = ref([...defaultEvents]);
 
-        // 🌟 3. 連線到 Supabase 雲端 (雙向即時監聽與對等儲存)
+        // 連線到 Supabase 雲端 (雙向即時監聽與對等儲存)
         const connectToSupabase = async () => {
             supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             
@@ -339,7 +341,7 @@ createApp({
             }
             isSynced.value = true;
 
-            // 即時追蹤並實時同步更新數據 (無論哪一台設備修改都會瞬間渲染)
+            // 即時追蹤並實時同步更新數據
             supabaseClient
                 .channel('any')
                 .on('postgres_changes', { 
@@ -357,7 +359,6 @@ createApp({
 
         // 更新資料到雲端
         const updateEventsCloud = async () => {
-            // 排序確保時間順序正確
             events.value.sort((a, b) => a.time.localeCompare(b.time));
             localStorage.setItem('trip_events_viewer', JSON.stringify(events.value));
             
@@ -484,6 +485,7 @@ createApp({
             }
         };
 
+        // 🌟 核心修改：優化季節預報的降雨率邏輯
         const activeWeather = computed(() => {
             const targetDayObj = days[selectedDay.value];
             if (!targetDayObj) return { typeTitle: '⏳ 載入中', badgeClass: 'bg-slate-400', icon: '⏳', desc: '正在準備資料...', tempInfo: '--°C', pop: null };
